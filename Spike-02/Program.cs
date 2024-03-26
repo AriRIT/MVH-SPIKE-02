@@ -11,6 +11,7 @@ using Microsoft.Extensions.Hosting;
 using System.Web;
 using System.Net.Http;
 
+
 namespace smart_local
 {
     /// <summary>
@@ -19,7 +20,7 @@ namespace smart_local
     public static class Program
     {
         private const string _clientId = "fhir_demo_id";
-        private const string _defaultFhirServerUrl = "https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSIsImUiOiJlZmI1ZDRjZS1kZmZjLTQ3ZGYtYWE2ZC0wNWQzNzJmZGI0MDcifQ/fhir/";
+        private const string _defaultFhirServerUrl = "https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSIsImUiOiJlZmI1ZDRjZS1kZmZjLTQ3ZGYtYWE2ZC0wNWQzNzJmZGI0MDcifQ/fhir";
 
         private static string _authCode = string.Empty;
         private static string _clientState = string.Empty;
@@ -47,7 +48,7 @@ namespace smart_local
             System.Console.WriteLine($"  FHIR Server: {fhirServerUrl}");
             _fhirServerUrl = fhirServerUrl;
 
-            Hl7.Fhir.Rest.FhirClient fhirClient = new Hl7.Fhir.Rest.FhirClient(fhirServerUrl);
+            Hl7.Fhir.Rest.FhirClient fhirClient = new Hl7.Fhir.Rest.FhirClient(fhirServerUrl+"/");
 
             if (!FhirUtils.TryGetSmartUrls(fhirClient, out string authorizeUrl, out string tokenUrl))
             {
@@ -80,13 +81,11 @@ namespace smart_local
                 $"?response_type=code" + 
                 $"&client_id={_clientId}" +
                 $"&redirect_uri={HttpUtility.UrlEncode(_redirectUrl)}" +
-                $"&scope={HttpUtility.UrlEncode("openid fhirUser profile launch/patient patient/*.read")}" +
+                $"&scope={HttpUtility.UrlEncode("openid fhirUser profile launch/patient patient/*.cruds")}" + //$"&scope={HttpUtility.UrlEncode("openid fhirUser profile launch/patient patient/*.read")}"
                 $"&state=local_state" +
-                $"&aud=https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSIsImUiOiJlZmI1ZDRjZS1kZmZjLTQ3ZGYtYWE2ZC0wNWQzNzJmZGI0MDcifQ/fhir";
+                $"&aud={fhirServerUrl}";
 
             LaunchUrl(url);
-
-            // http://127.0.0.1:54678/?code=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJjb250ZXh0Ijp7Im5lZWRfcGF0aWVudF9iYW5uZXIiOnRydWUsInNtYXJ0X3N0eWxlX3VybCI6Imh0dHBzOi8vbGF1bmNoLnNtYXJ0aGVhbHRoaXQub3JnL3NtYXJ0LXN0eWxlLmpzb24iLCJwYXRpZW50IjoiMmNkYTVhYWQtZTQwOS00MDcwLTlhMTUtZTFjMzVjNDZlZDVhIn0sImNsaWVudF9pZCI6ImZoaXJfZGVtb19pZCIsInNjb3BlIjoib3BlbmlkIGZoaXJVc2VyIHByb2ZpbGUgbGF1bmNoL3BhdGllbnQgcGF0aWVudC8qLnJlYWQiLCJ1c2VyIjoiUHJhY3RpdGlvbmVyL2VmYjVkNGNlLWRmZmMtNDdkZi1hYTZkLTA1ZDM3MmZkYjQwNyIsImlhdCI6MTYwNDMzMjkxNywiZXhwIjoxNjA0MzMzMjE3fQ.RkZEP3eKVydMLc5wW0FJEtTqYoTOuwgtoTcjhjevAC0&state=local_state
 
             for (int loops = 0; loops < 30; loops++)
             {
@@ -150,6 +149,7 @@ namespace smart_local
         /// <param name="smartResponse"></param>
         public static void DoSomethingWithToken(SmartResponse smartResponse)
         {
+            bool addName = false;
             if (smartResponse == null)
             {
                 throw new ArgumentNullException(nameof(smartResponse));
@@ -170,7 +170,28 @@ namespace smart_local
 
             Hl7.Fhir.Model.Patient patient = fhirClient.Read<Hl7.Fhir.Model.Patient>($"Patient/{smartResponse.PatientId}");
 
+
             System.Console.WriteLine($"Read back patient: {patient.Name[0].ToString()}");
+            System.Console.WriteLine($"Birthday: {patient.BirthDate.ToString()}");
+            if (patient.Deceased != null) System.Console.WriteLine($"is Deceased: True \nDeceased date: {patient.Deceased.ToString()}"); 
+            else System.Console.WriteLine($"is Deceased: False"); 
+            if (addName){
+                Hl7.Fhir.Model.HumanName second_name = new Hl7.Fhir.Model.HumanName();
+
+                second_name.Text = "John Smith";
+                second_name.Prefix.Append<string>("Dr.");
+            
+                patient.Name.Add(second_name);
+
+                fhirClient.Update<Hl7.Fhir.Model.Patient>(patient);
+            }
+
+            for (int i = 0; i < patient.Name.Count; i++){
+                System.Console.WriteLine($"Name {i} : {patient.Name[i].ToString()}");
+            }
+
+            
+            
         }
 
         /// <summary>
